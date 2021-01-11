@@ -26,6 +26,7 @@ const signalOptionBEnd = Buffer.from([0x00, 0x00, 0x0c, 0x00, 0x06]);
         console.error('usage: options: ext : extract texts from decrypted ws2 file.');
         console.error('usage: options: pak : repackage texts to decrypted ws2 file. Need origin ws2 folder.');
         console.error('usage: options: trn : transfrom texts from ahdprc texts. Need ahdprc texts folder.');
+        console.error('usage: options: ror : decrypt or crypt ws2, unpack use -2, pack use 2.');
         return;
     }
 
@@ -45,7 +46,7 @@ const signalOptionBEnd = Buffer.from([0x00, 0x00, 0x0c, 0x00, 0x06]);
     }
     
     if (process.argv[2] === 'ror') {
-        let filelist = getFileList(process.argv[3]);
+        let filelist = getFileList(process.argv[3], true);
         filelist.forEach(file => rorf(file, process.argv[4]));
     }
 }();
