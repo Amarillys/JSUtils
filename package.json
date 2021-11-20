@@ -1,0 +1,22 @@
+{
+  "name": "kemono",
+  "version": "0.0.1",
+  "description": "nashi~~",
+  "main": "kemono.js",
+  "scripts": {
+    "test": "https://kemono.party/fanbox/user/73798"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Amarillys/"
+  },
+  "keywords": [
+    "kemono"
+  ],
+  "author": "https://github.com/Amarillys",
+  "license": "WTFPL",
+  "dependencies": {
+    "cheerio": "^1.0.0-rc.10",
+    "colors": "^1.4.0"
+  }
+}
