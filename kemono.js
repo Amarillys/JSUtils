@@ -67,7 +67,7 @@ async function main() {
         await delay(5000)
         post = await (await fetch(pageURL, headers))
       }
-      let progressCount = seq ? (postIndex + 1) : (posts.length - postIndex)
+      let progressCount = seq ? (postIndex + 1) : (count - index - postIndex)
       console.log(`${LOG.fetched}  ${LOG.post}` + '  ' + ` ${progressCount} / ${count} `.bgBlue.white + '  ' + pageURL)
 
       const $ = cheerio.load(post)
@@ -115,7 +115,7 @@ async function main() {
       if (seq && postIndex >= posts.length) break
       if (!seq && postIndex < 0) break
     } while (true)
-    index += 25 * seq
+    index += 25 * (seq ? 1 : -1)
     pool.run()
   } while (index < count && !isEnd)
 
