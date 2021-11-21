@@ -1,7 +1,7 @@
 const fs = require('fs')
 const cheerio = require('cheerio')
-const ThreadPool = require('./lib/threadpool-mkz')
-const { download, fetch, delay, LOG, fileExists }= require('./lib/utils')
+const ThreadPool = require('./threadpool-mkz')
+const { download, fetch, delay, LOG, fileExists }= require('./utils')
 const colors = require('colors')
 
 const DL_Path = 'download'
@@ -15,10 +15,12 @@ let errorLog = ''
 
 async function main() {
   const url = process.argv[2]
-  if (!url) return console.log('node kemono.js <url> [outputPath] [threads]')
+  if (!url) return console.log('node kemono.js <url> [outputPath] [threads] [cookies]')
   let dst = process.argv[3] || DL_Path
   const threads = process.argv[4] || 4
   headers.Cookie = process.argv[5] || headers.Cookie
+  let seq = parseInt(process.argv[6]) !== -1 ? true : false
+  // const excludeExts = process.argv[6] || ''
   
   const pool = new ThreadPool(threads)
   pool.step = () => console.log(' Progress > '.bgBlue.white + '  ' + ` ${ pool.counter } / ${ pool.sum }  ${ pool.status() } `.bgMagenta.white)
@@ -34,19 +36,30 @@ async function main() {
   let index = 0
   let count = 0
   let init = false
+  let isEnd = false
   do {
+    if (index < 0) {
+      index = 0;
+      isEnd = true;
+    }
     const pageInfo = await getPageInfo(url, index)
     const { posts, artistName } = pageInfo
     if (!init) {
       dst = `${dst}/${artistName}`
       count = count || pageInfo.count
+      init = true
+      if (!seq) {
+        index = count - 25
+        continue
+      }
     }
-    init = true
+    
     if (!(await fileExists(dst))) await fs.promises.mkdir(dst, { recursive: true })
     if (posts.length === 0) break
 
-    for (let i = 0; i < posts.length; ++i) {
-      let pageURL = `${url.split('?')[0]}/post/${posts[i]}`
+    let postIndex = seq ? 0 : posts.length - 1
+    do {
+      let pageURL = `${url.split('?')[0]}/post/${posts[postIndex]}`
       console.log(`${LOG.fetching}  ${LOG.post}  ${pageURL}`)
       let post = await fetch(pageURL, headers)
       while (!post.includes(url.split('kemono.part')[1])) {
@@ -54,11 +67,13 @@ async function main() {
         await delay(5000)
         post = await (await fetch(pageURL, headers))
       }
-      console.log(`${LOG.fetched}  ${LOG.post}` + '  ' + ` ${i + 1} / ${count} `.bgBlue.white + '  ' + pageURL)
+      let progressCount = seq ? (postIndex + 1) : (posts.length - postIndex)
+      console.log(`${LOG.fetched}  ${LOG.post}` + '  ' + ` ${progressCount} / ${count} `.bgBlue.white + '  ' + pageURL)
 
       const $ = cheerio.load(post)
       const titleNode = $('.post__title')
-      const title = `${count - index - i}-` + titleNode.text().trim().slice(0, titleNode.text().trim().lastIndexOf('(') - 1)
+      let titleIndex = seq ? (count - index - postIndex) : (index + postIndex + 1)
+      const title = `${titleIndex}-` + titleNode.text().trim().slice(0, titleNode.text().trim().lastIndexOf('(') - 1)
       if (!(await fileExists(`${dst}/${title}`))) await fs.promises.mkdir(`${dst}/${title}`, { recursive: true })
 
       const content = $('.post__content').text()
@@ -68,6 +83,7 @@ async function main() {
         filename: attach.childNodes[1].firstChild.data.trim().slice(9),
         url: attach.childNodes[1].attribs.href
       }))).forEach(attach => {
+        // if (excludeExts && excludeExts)
         pool.add(async () => {
           let url = `https://kemono.party${attach.url}`
           let redirectLink = await fetch(url, headers)
@@ -94,10 +110,14 @@ async function main() {
           }
         })
       })
-    }
-    index += 25
+
+      postIndex += seq ? 1 : -1
+      if (seq && postIndex >= posts.length) break
+      if (!seq && postIndex < 0) break
+    } while (true)
+    index += 25 * seq
     pool.run()
-  } while (index < count)
+  } while (index < count && !isEnd)
 
   async function getPageInfo(url, index) {
     url = `${url}?o=${index}`
