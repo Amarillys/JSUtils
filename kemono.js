@@ -21,17 +21,9 @@ async function main() {
   headers.Cookie = process.argv[5] || headers.Cookie
   let seq = parseInt(process.argv[6]) !== -1 ? true : false
   // const excludeExts = process.argv[6] || ''
-  
-  const pool = new ThreadPool(threads)
-  pool.step = () => console.log(' Progress > '.bgBlue.white + '  ' + ` ${ pool.counter } / ${ pool.sum }  ${ pool.status() } `.bgMagenta.white)
-  pool.finish(() => {
-    console.log(' Finished '.bgGreen.white)
-    if (errorLog.length > 0) {
-      fs.writeFile('error.log', errorLog, () => {
-        console.warn(' Error Occurred. Error Log Generated '.bgRed.white)
-      })
-    }
-  })
+
+  let poolIndex = 1
+  let pool = initPool(threads, poolIndex)
 
   let index = 0
   let count = 0
@@ -42,7 +34,12 @@ async function main() {
       index = 0;
       isEnd = true;
     }
-    const pageInfo = await getPageInfo(url, index)
+    let pageInfo = ''
+    try {
+      pageInfo = await getPageInfo(url, index)
+    } catch {
+      continue
+    }
     const { posts, artistName } = pageInfo
     if (!init) {
       dst = `${dst}/${artistName}`
@@ -61,11 +58,16 @@ async function main() {
     do {
       let pageURL = `${url.split('?')[0]}/post/${posts[postIndex]}`
       console.log(`${LOG.fetching}  ${LOG.post}  ${pageURL}`)
-      let post = await fetch(pageURL, headers)
-      while (!post.includes(url.split('kemono.part')[1])) {
-        console.log(`${LOG.retry}  ${LOG.post} retry in 5 seconds:  ${pageURL}`)
-        await delay(5000)
-        post = await (await fetch(pageURL, headers))
+      let post = ''
+      try {
+        post = await fetch(pageURL, headers)
+        while (!post.includes(url.split('kemono.part')[1])) {
+          console.log(`${LOG.retry}  ${LOG.post} retry in 5 seconds:  ${pageURL}`)
+          await delay(5000)
+          post = await (await fetch(pageURL, headers))
+        }
+      } catch {
+        continue
       }
       let progressCount = seq ? (postIndex + 1) : (count - index - postIndex)
       console.log(`${LOG.fetched}  ${LOG.post}` + '  ' + ` ${progressCount} / ${count} `.bgBlue.white + '  ' + pageURL)
@@ -84,6 +86,9 @@ async function main() {
         url: attach.childNodes[1].attribs.href
       }))).forEach(attach => {
         // if (excludeExts && excludeExts)
+        if (pool.isFinished()) {
+          pool = initPool(threads, ++poolIndex)
+        }
         pool.add(async () => {
           let url = `https://kemono.party${attach.url}`
           let redirectLink = await fetch(url, headers)
@@ -100,6 +105,9 @@ async function main() {
         filename: file.childNodes[1].attribs.href.split('f=')[1],
         url: file.childNodes[1].attribs.href
       }))).forEach((file, index) => {
+        if (pool.isFinished()) {
+          pool = initPool(threads, ++poolIndex)
+        }
         pool.add(async () => {
           let url = `https://kemono.party${file.url}`
           let redirectLink = await fetch(url, headers)
@@ -138,6 +146,20 @@ async function main() {
       count: +$('#paginator-top small')[0].children[0].data.trim().split('of')[1].trim()
     }
   }
+}
+
+function initPool(threads, index) {
+  const pool = new ThreadPool(threads)
+  pool.step = () => console.log(` Pool ${index} `.bgBlue.white + ' Progress > '.bgBlue.white + '  ' + ` ${ pool.counter } / ${ pool.sum }  ${ pool.status() } `.bgMagenta.white)
+  pool.finish(() => {
+    console.log(` Pool ${index}  Finished `.bgGreen.white)
+    if (errorLog.length > 0) {
+      fs.writeFile('error.log', errorLog, () => {
+        console.warn(' Error Occurred. Error Log Generated '.bgRed.white)
+      })
+    }
+  })
+  return pool
 }
 
 main();
