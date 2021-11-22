@@ -1,7 +1,8 @@
 const fs = require('fs')
+const path = require('path')
 const cheerio = require('cheerio')
 const ThreadPool = require('./threadpool-mkz')
-const { download, fetch, delay, LOG, fileExists }= require('./utils')
+const { download, fetch, delay, LOG, fileExists, purifyName }= require('./utils')
 const colors = require('colors')
 
 const DL_Path = 'download'
@@ -15,12 +16,18 @@ let errorLog = ''
 
 async function main() {
   const url = process.argv[2]
-  if (!url) return console.log('node kemono.js <url> [outputPath] [threads] [cookies]')
+  if (!url) return console.log('node kemono.js <url> [outputPath] [threads] [cookies] [sequence(1/-1)] [exclude extension(.rar,.zip)]')
   let dst = process.argv[3] || DL_Path
   const threads = process.argv[4] || 4
   headers.Cookie = process.argv[5] || headers.Cookie
   let seq = parseInt(process.argv[6]) !== -1 ? true : false
-  // const excludeExts = process.argv[6] || ''
+  const excludeExts = process.argv[7] || ''
+
+  const willBeExcluded = fileName => {
+    if (!excludeExts) return false
+    let ext = path.parse(fileName).ext
+    if (excludeExts.includes(ext)) return true
+  };
 
   let poolIndex = 1
   let pool = initPool(threads, poolIndex)
@@ -74,26 +81,24 @@ async function main() {
 
       const $ = cheerio.load(post)
       const titleNode = $('.post__title')
-      let titleIndex = seq ? (count - index - postIndex) : (index + postIndex + 1)
+      let titleIndex = count - index - postIndex
       const title = `${titleIndex}-` + titleNode.text().trim().slice(0, titleNode.text().trim().lastIndexOf('(') - 1)
       if (!(await fileExists(`${dst}/${title}`))) await fs.promises.mkdir(`${dst}/${title}`, { recursive: true })
 
       const content = $('.post__content').text()
-      if (content.length > 0) fs.writeFile(`${dst}/${title}/content.txt`, content.trim(), () => {})
+      if (content.length > 0) fs.writeFile(`${dst}/${purifyName(title)}/content.txt`, content.trim(), () => {})
 
       Array.from($('.post__attachments li').map((i, attach) => ({
         filename: attach.childNodes[1].firstChild.data.trim().slice(9),
         url: attach.childNodes[1].attribs.href
       }))).forEach(attach => {
-        // if (excludeExts && excludeExts)
-        if (pool.isFinished()) {
-          pool = initPool(threads, ++poolIndex)
-        }
+        if (willBeExcluded(attach.filename)) return
+        if (pool.isFinished()) pool = initPool(threads, ++poolIndex)
         pool.add(async () => {
           let url = `https://kemono.party${attach.url}`
           let redirectLink = await fetch(url, headers)
           try {
-            await download(redirectLink, `${dst}/${title}/${attach.filename}`, false, { headers })
+            await download(redirectLink, `${dst}/${purifyName(title)}/${attach.filename}`, false, { headers })
           } catch (e) {
             errorLog += e
           }
@@ -105,14 +110,13 @@ async function main() {
         filename: file.childNodes[1].attribs.href.split('f=')[1],
         url: file.childNodes[1].attribs.href
       }))).forEach((file, index) => {
-        if (pool.isFinished()) {
-          pool = initPool(threads, ++poolIndex)
-        }
+        if (willBeExcluded(file.filename)) return
+        if (pool.isFinished()) pool = initPool(threads, ++poolIndex)
         pool.add(async () => {
           let url = `https://kemono.party${file.url}`
           let redirectLink = await fetch(url, headers)
           try {
-            await download(redirectLink, `${dst}/${title}/${index}-${file.filename}`, false, { headers })
+            await download(redirectLink, `${dst}/${purifyName(title)}/${index}-${file.filename}`, false, { headers })
           } catch (e) {
             errorLog += e
           }
@@ -162,4 +166,4 @@ function initPool(threads, index) {
   return pool
 }
 
-main();
+main()
