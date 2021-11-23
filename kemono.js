@@ -81,7 +81,7 @@ async function main() {
 
       const $ = cheerio.load(post)
       const titleNode = $('.post__title')
-      let titleIndex = count - index - postIndex
+      let titleIndex = $('.post__published time').text().trim().split(' ')[0] || ''
       const title = `${titleIndex}-` + titleNode.text().trim().slice(0, titleNode.text().trim().lastIndexOf('(') - 1)
       if (!(await fileExists(`${dst}/${title}`))) await fs.promises.mkdir(`${dst}/${title}`, { recursive: true })
 
