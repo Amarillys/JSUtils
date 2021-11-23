@@ -82,11 +82,11 @@ async function main() {
       const $ = cheerio.load(post)
       const titleNode = $('.post__title')
       let titleIndex = $('.post__published time').text().trim().split(' ')[0] || ''
-      const title = `${titleIndex}-` + titleNode.text().trim().slice(0, titleNode.text().trim().lastIndexOf('(') - 1)
+      const title = purifyName(`${titleIndex}-` + titleNode.text().trim().slice(0, titleNode.text().trim().lastIndexOf('(') - 1))
       if (!(await fileExists(`${dst}/${title}`))) await fs.promises.mkdir(`${dst}/${title}`, { recursive: true })
 
       const content = $('.post__content').text()
-      if (content.length > 0) fs.writeFile(`${dst}/${purifyName(title)}/content.txt`, content.trim(), () => {})
+      if (content.length > 0) fs.writeFile(`${dst}/${title}/content.txt`, content.trim(), () => {})
 
       Array.from($('.post__attachments li').map((i, attach) => ({
         filename: attach.childNodes[1].firstChild.data.trim().slice(9),
@@ -98,7 +98,7 @@ async function main() {
           let url = `https://kemono.party${attach.url}`
           let redirectLink = await fetch(url, headers)
           try {
-            await download(redirectLink, `${dst}/${purifyName(title)}/${attach.filename}`, false, { headers })
+            await download(redirectLink, `${dst}/${title}/${attach.filename}`, false, { headers })
           } catch (e) {
             errorLog += e
           }
@@ -116,7 +116,7 @@ async function main() {
           let url = `https://kemono.party${file.url}`
           let redirectLink = await fetch(url, headers)
           try {
-            await download(redirectLink, `${dst}/${purifyName(title)}/${index}-${file.filename}`, false, { headers })
+            await download(redirectLink, `${dst}/${title}/${index}-${file.filename}`, false, { headers })
           } catch (e) {
             errorLog += e
           }
