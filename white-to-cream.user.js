@@ -88,6 +88,9 @@
         if (cls && typeof cls === 'string' && SKIP_BG_CLASS.test(cls.toLowerCase())) return true;
         var type = el.type;
         if (type && type === 'button') return true;
+        // for x
+        let testid = el.dataset?.testid;
+        if (testid && testid === 'article' || testid === 'mask') return true;
         return false;
     }
 
