@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         网页舒适化（白底/黑底/白字）
 // @namespace    https://opencode.local/cream
-// @version      1.7.1
-// @description  纯白背景→Claude米色、纯黑背景→暖深灰、纯白文字→暖灰白，按原明度梯度映射保留层级差异。5档强度可调（油猴菜单），过滤span/遮罩层等内联元素背景。支持 Shadow DOM。
+// @version      1.7.2
+// @description  纯白背景→Claude米色、纯黑背景→暖深灰、纯白文字→暖灰白，按原明度梯度映射保留层级差异。保留原背景透明度（半透明背景不改为不透明）。5档强度可调（油猴菜单），过滤span/遮罩层等内联元素背景。支持 Shadow DOM。
 // @author       opencode
 // @match        *://*/*
 // @include      file:///*
@@ -90,7 +90,7 @@
         if (type && type === 'button') return true;
         // for x
         let testid = el.dataset?.testid;
-        if (testid && testid === 'article' || testid === 'mask') return true;
+        if (testid && testid === 'article' || testid === 'mask' || testid === 'tweet') return true;
         return false;
     }
 
@@ -126,9 +126,14 @@
     }
 
     function mappedRgb(c, br, bg, bb, range, lo, hi) {
-        return 'rgb(' + mapChannel(c.r, br, range, lo, hi) + ','
-                     + mapChannel(c.g, bg, range, lo, hi) + ','
-                     + mapChannel(c.b, bb, range, lo, hi) + ')';
+        var r = mapChannel(c.r, br, range, lo, hi);
+        var g = mapChannel(c.g, bg, range, lo, hi);
+        var b = mapChannel(c.b, bb, range, lo, hi);
+        // 保留原透明度：a<1 时输出 rgba，避免把半透明背景改成不透明
+        if (c.a < 1) {
+            return 'rgba(' + r + ',' + g + ',' + b + ',' + c.a + ')';
+        }
+        return 'rgb(' + r + ',' + g + ',' + b + ')';
     }
 
     // 保存各元素首次接触时的原始内联样式，复扫时先恢复再读取，实现自纠且不破坏站点样式
